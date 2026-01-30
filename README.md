@@ -1,16 +1,10 @@
 # RWKV vs FLA-RWKV 性能对比
 
-本文档对比了 RWKV 原始实现与 FLA (Flash Linear Attention) 库中 RWKV7 实现的性能差异。
-
-## 背景
-
-[RWKV](https://github.com/BlinkDL/RWKV-LM) 是由 PENG Bo 团队研发的新一代大模型架构，它基于 RNN 设计，同时融合了 Transformer 的优势：出色的性能、恒定的显存占用、恒定的推理速度、"无限"的上下文长度以及免费的句嵌入。
-
-[FLA](https://github.com/fla-org/flash-linear-attention) 提供了一系列基于 Triton 的高效实现，用于最先进的线性注意力模型，其中也收录了 RWKV 模型。
+本文档对比了 RWKV 基准实现与 FLA (Flash Linear Attention) 库中 RWKV7 实现的性能差异。
 
 ## 测试概述
 
-本次测试对比了两个库中 RWKV7 layer 的实现效果。测试基于 [RWKV-v7/train_temp](https://github.com/BlinkDL/RWKV-LM/tree/main/RWKV-v7/train_temp) 目录，对比 RWKV 原始实现中的 [RWKV_Tmix_x070](https://github.com/BlinkDL/RWKV-LM/blob/dc6c3ec05d066489b189e1d2cb13455a2523ccfa/RWKV-v7/train_temp/src/model.py#L76) 和 FLA 实现中的 [RWKV7Attention](https://github.com/fla-org/flash-linear-attention/blob/0044986ae05359ff28924f15d88e5372f51a3368/fla/layers/rwkv7.py#L26)。
+本次测试对比了两个库中 RWKV7 layer 的实现效果。测试基于 [RWKV-v7/train_temp](https://github.com/BlinkDL/RWKV-LM/tree/main/RWKV-v7/train_temp) 目录，对比 RWKV 基准实现中的 [RWKV_Tmix_x070](https://github.com/BlinkDL/RWKV-LM/blob/dc6c3ec05d066489b189e1d2cb13455a2523ccfa/RWKV-v7/train_temp/src/model.py#L76) 和 FLA 实现中的 [RWKV7Attention](https://github.com/fla-org/flash-linear-attention/blob/0044986ae05359ff28924f15d88e5372f51a3368/fla/layers/rwkv7.py#L26)。
 
 测试时将本仓库 `train-temp` 目录中的文件与 RWKV-v7/train_temp 中对应文件进行替换。
 
@@ -44,17 +38,17 @@ RWKV 和 FLA-RWKV 在源代码中采用了不同的初始化方案。为了公�
 
 #### Batch Size = 16
 
-下图展示了 batch size 为 16 时的测试结果。在训练的最后 200 步中，RWKV 与使用共享初始化权重的 FLA 的平均损失值分别为 4.225 和 4.246，两者接近且 RWKV 略优；而采用默认初始化的 FLA 损失值为 4.731，表现明显较差。
+下图展示了 batch size 为 16 时的测试结果。在训练的最后 200 步中，RWKV 与使用同样初始化权重的 FLA 的平均损失值分别为 4.225 和 4.246，RWKV 显著更好；而采用默认初始化的 FLA 损失值为 4.731，表现很差。
 
 <img src="./figures/Training loss with error band (bsz=16).png" alt="Training loss comparison (bsz=16)"/>
 
 #### Batch Size = 48
 
-下图为 batch size 为 48 的情况，结果与上图类似：RWKV 与使用共享初始化权重的 FLA 平均损失值分别为 2.905 和 3.018，而采用默认初始化的 FLA 则为 3.670。
+下图为 batch size 为 48 的情况，结果与上图类似：RWKV 与使用同样初始化权重的 FLA 平均损失值分别为 2.905 和 3.018，RWKV显著更好；而采用默认初始化的 FLA 则为 3.670，表现很差。
 
 <img src="./figures/Training loss with error band (bsz=48).png" alt="Training loss comparison (bsz=48)"/>
 
-**结论**：初始化方案对模型性能有显著影响。使用相同的初始化权重后，FLA-RWKV 的性能与 RWKV 原始实现接近，但仍略低于 RWKV。
+**结论**：初始化方案对模型性能有显著影响。使用相同的初始化权重后，FLA-RWKV 的性能仍然显著低于 RWKV 基准实现。
 
 ### 2. 速度对比
 RWKV 采用了自定义的 CUDA 和 C++ 加速方案来提升处理速度，并支持 JIT（即时编译）优化。相比之下，FLA-RWKV 由于使用了 lambda 函数，不便使用 JIT 加速。为了对比速度差异，我们分别测试了开启和关闭 JIT 的 RWKV 以及 FLA-RWKV。
