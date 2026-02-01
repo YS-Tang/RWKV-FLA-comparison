@@ -1,6 +1,6 @@
 # RWKV vs FLA-RWKV 性能对比
 
-本文档对比了 RWKV 基准实现与 FLA (Flash Linear Attention) 库中 RWKV7 实现的性能差异。
+本文档对比了 [RWKV](https://github.com/BlinkDL/RWKV-LM) 基准实现与 [FLA](https://github.com/fla-org/flash-linear-attention) (Flash Linear Attention) 库中 RWKV7 实现的性能差异。
 
 ## 测试概述
 
@@ -34,50 +34,25 @@
 ### 1. 初始化影响
 RWKV 和 FLA-RWKV 在源代码中采用了不同的初始化方案。为了公平对比，我们分别测试了各自默认初始化方案以及使用相同初始权重的情况。共享的初始权重采用 RWKV 初始化时生成的权重，两个实现的模型命名对齐参见 [RWKV与FLA-RWKV命名对齐](RWKV与FLA-RWKV命名对齐.md)。
 
-测试的超参数设置参见测试脚本 [demo-training-run.sh](./train-temp/demo-training-run.sh)，分别测试了 batch size 为 16 和 48 的两种场景。
+测试的超参数设置参见测试脚本 [demo-training-run.sh](./train-temp/demo-training-run.sh)，测试了 batch size 为 48 的场景。
 
-#### Batch Size = 16
-
-下图展示了 batch size 为 16 时的测试结果。在训练的最后 200 步中，RWKV 与使用同样初始化权重的 FLA 的平均损失值分别为 4.225 和 4.246，RWKV 显著更好；而采用默认初始化的 FLA 损失值为 4.731，表现很差。
-
-<img src="./figures/Training loss with error band (bsz=16).png" alt="Training loss comparison (bsz=16)"/>
-
-#### Batch Size = 48
-
-下图为 batch size 为 48 的情况，结果与上图类似：RWKV 与使用同样初始化权重的 FLA 平均损失值分别为 2.905 和 3.018，RWKV显著更好；而采用默认初始化的 FLA 则为 3.670，表现很差。
+下图展示了训练 2000 步的测试结果。在训练的最后 200 步中，RWKV 与使用同样初始化权重的 FLA 的平均损失值分别为 2.965 和 3.018，RWKV 显著更好；而采用默认初始化的 FLA 损失值为 3.670，表现很差。
 
 <img src="./figures/Training loss with error band (bsz=48).png" alt="Training loss comparison (bsz=48)"/>
 
-**结论**：初始化方案对模型性能有显著影响。使用相同的初始化权重后，FLA-RWKV 的性能仍然显著低于 RWKV 基准实现。
+**结论**：初始化影响显著：FLA-RWKV 使用默认初始化时性能很差，使用 RWKV 基准实现的初始化权重后仍显著低于 RWKV。
 
 ### 2. 速度对比
 RWKV 采用了自定义的 CUDA 和 C++ 加速方案来提升处理速度，并支持 JIT（即时编译）优化。相比之下，FLA-RWKV 由于使用了 lambda 函数，不便使用 JIT 加速。为了对比速度差异，我们分别测试了开启和关闭 JIT 的 RWKV 以及 FLA-RWKV。
 
-#### Batch Size = 16
-
-下图展示了 batch size 为 16 时的每秒千词元数（kt/s）。在剔除极端数据后，关闭和开启 JIT 情况下的 RWKV 速度分别为 40.521 kt/s 和 43.123 kt/s，而 FLA-RWKV 的速度为 33.862 kt/s。
-
-<img src="./figures/Kilo-tokens per second (bsz=16).png" alt="Training speed comparison (bsz=16)"/>
-
-#### Batch Size = 48
-
-下图为 batch size 为 48 的情况：关闭和开启 JIT 情况下的 RWKV 速度分别为 41.355 kt/s 和 43.200 kt/s，而 FLA-RWKV 的速度为 34.415 kt/s。
+下图展示了 batch size 为 48 时的每秒千词元数（kt/s）。在使用 IQR 方法剔除极端数据后，关闭和开启 JIT 情况下的 RWKV 速度分别为 41.443 kt/s 和 46.253 kt/s，而 FLA-RWKV 的速度为 34.365 kt/s。
 
 <img src="./figures/Kilo-tokens per second (bsz=48).png" alt="Training speed comparison (bsz=48)"/>
 
-**结论**：RWKV 原始实现在训练速度上明显优于 FLA-RWKV。开启 JIT 后，RWKV 的速度提升了约 5-6%，而 FLA-RWKV 的速度约为 RWKV 的 80% 左右。
+**结论**：RWKV 基准实现在训练速度上明显优于 FLA-RWKV, FLA-RWKV 的速度约为 RWKV 的 83% 左右。开启 JIT 后，RWKV 的速度再提升约 11-12%。
 
 ## 总结
 
-| 指标 | RWKV | FLA-RWKV (共享初始化) | FLA-RWKV (默认初始化) |
-|------|------|----------------------|----------------------|
-| 训练损失 (bsz=16) | 4.225 | 4.246 | 4.731 |
-| 训练损失 (bsz=48) | 2.905 | 3.018 | 3.670 |
-| 训练速度 (bsz=16, kt/s) | 43.123 (JIT开启) | 33.862 | - |
-| 训练速度 (bsz=48, kt/s) | 43.200 (JIT开启) | 34.415 | - |
 
-**主要发现**：
-
-1. **初始化影响显著**：FLA-RWKV 使用默认初始化时性能明显下降，使用 RWKV 的初始化权重后性能接近但仍略低于 RWKV
-2. **训练速度差异**：RWKV 原始实现的训练速度比 FLA-RWKV 快约 20-25%
-3. **JIT 加速效果**：RWKV 开启 JIT 后速度提升约 5-6%
+1. **初始化影响显著**：FLA-RWKV 使用默认初始化时性能很差，使用 RWKV 基准实现的初始化权重后仍显著低于 RWKV。
+2. **训练速度差异**：RWKV 基准实现在训练速度上明显优于 FLA-RWKV, FLA-RWKV 的速度约为 RWKV 的 83% 左右。开启 JIT 后，RWKV 的速度再提升约 11-12%。
